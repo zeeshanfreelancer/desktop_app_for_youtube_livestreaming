@@ -1,6 +1,7 @@
 const { app, BrowserWindow } = require('electron')
 const fs = require('fs')
 const path = require('path')
+const { registerLocalMediaProtocol } = require('./protocol/localMedia.cjs')
 const { registerFileHandlers } = require('./ipc/files.cjs')
 const { registerSettingsHandlers } = require('./ipc/settings.cjs')
 const { registerStreamHandlers } = require('./ipc/stream.cjs')
@@ -39,6 +40,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  registerLocalMediaProtocol()
   registerFileHandlers()
   registerSettingsHandlers()
   registerStreamHandlers(() => mainWindow)

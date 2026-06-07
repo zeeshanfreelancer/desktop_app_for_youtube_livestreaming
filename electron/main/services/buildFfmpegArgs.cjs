@@ -9,11 +9,24 @@ function scalePadFilter(width, height) {
   return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
 }
 
-function buildOutputUrls(streamKeys) {
-  return streamKeys
+function buildOutputArgs(streamKeys) {
+  const urls = streamKeys
     .filter((key) => key && key.trim())
-    .map((key) => `[f=flv:flvflags=no_duration_filesize]${YOUTUBE_RTMP}/${key.trim()}`)
+    .map((key) => `${YOUTUBE_RTMP}/${key.trim()}`)
+
+  if (urls.length === 0) {
+    throw new Error('No valid stream keys provided')
+  }
+
+  if (urls.length === 1) {
+    return ['-f', 'flv', urls[0]]
+  }
+
+  const teeSpec = urls
+    .map((url) => `[f=flv:flvflags=no_duration_filesize]${url}`)
     .join('|')
+
+  return ['-f', 'tee', teeSpec]
 }
 
 function buildEncodingArgs(bitrateKbps) {
@@ -43,14 +56,10 @@ function buildFfmpegArgs(config) {
   } = config
 
   const { width, height } = RESOLUTIONS[resolution] || RESOLUTIONS['720p']
-  const teeOutput = buildOutputUrls(streamKeys)
-
-  if (!teeOutput) {
-    throw new Error('No valid stream keys provided')
-  }
+  const encoding = buildEncodingArgs(bitrateKbps)
+  const output = buildOutputArgs(streamKeys)
 
   const args = ['-y', '-hide_banner', '-loglevel', 'warning', '-threads', '2']
-  const encoding = buildEncodingArgs(bitrateKbps)
 
   if (mode === 'frame-only') {
     if (!framePath) throw new Error('Frame image is required for Frame Only mode')
@@ -60,10 +69,10 @@ function buildFfmpegArgs(config) {
       '-framerate', '30',
       '-i', framePath,
       '-vf', scalePadFilter(width, height),
+      '-map', '0:v:0',
       ...encoding,
       '-an',
-      '-f', 'tee',
-      teeOutput,
+      ...output,
     )
     return args
   }
@@ -79,12 +88,13 @@ function buildFfmpegArgs(config) {
       '-re',
       '-i', mediaPath,
       '-vf', scalePadFilter(width, height),
+      '-map', '0:v:0',
+      '-map', '0:a?',
       ...encoding,
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ar', '44100',
-      '-f', 'tee',
-      teeOutput,
+      ...output,
     )
     return args
   }
@@ -94,6 +104,10 @@ function buildFfmpegArgs(config) {
     if (!mediaPath) throw new Error('Media file is required for Frame + Media mode')
 
     const { x, y, width: ow, height: oh } = overlay
+    if (!ow || !oh) {
+      throw new Error('Video overlay size is invalid — resize the preview overlay first')
+    }
+
     const filter = [
       `[0:v]${scalePadFilter(width, height)}[bg]`,
       `[1:v]scale=${ow}:${oh}[vid]`,
@@ -120,8 +134,7 @@ function buildFfmpegArgs(config) {
       '-c:a', 'aac',
       '-b:a', '128k',
       '-ar', '44100',
-      '-f', 'tee',
-      teeOutput,
+      ...output,
     )
     return args
   }

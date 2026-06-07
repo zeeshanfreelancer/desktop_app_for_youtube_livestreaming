@@ -6,6 +6,7 @@ class FFmpegManager {
   constructor() {
     this.process = null
     this.onStatus = null
+    this.lastStderr = ''
   }
 
   setStatusCallback(callback) {
@@ -27,7 +28,12 @@ class FFmpegManager {
       throw new Error('Stream is already running')
     }
 
+    if (!ffmpegPath) {
+      throw new Error('FFmpeg binary not found')
+    }
+
     const args = buildFfmpegArgs(config)
+    this.lastStderr = ''
 
     this.emit('starting', 'Launching FFmpeg...')
 
@@ -42,9 +48,11 @@ class FFmpegManager {
     })
 
     this.process.stderr.on('data', (data) => {
-      const text = data.toString().trim()
-      if (text.includes('error') || text.includes('Error')) {
-        this.emit('error', text)
+      const text = data.toString()
+      this.lastStderr = (this.lastStderr + text).slice(-4000)
+      const line = text.trim()
+      if (line && (line.toLowerCase().includes('error') || line.includes('failed'))) {
+        this.emit('error', line)
       }
     })
 
@@ -58,7 +66,9 @@ class FFmpegManager {
       if (code === 0 || code === null) {
         this.emit('idle', 'Stream stopped')
       } else {
-        this.emit('error', `FFmpeg exited with code ${code}`)
+        const tail = this.lastStderr.trim().split('\n').slice(-3).join(' ')
+        const detail = tail || `exit code ${code}`
+        this.emit('error', `FFmpeg failed: ${detail}`)
       }
     })
 

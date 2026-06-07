@@ -32,6 +32,9 @@ export default function StreamControls() {
     if (layoutMode === LAYOUT_MODES.FRAME_MEDIA) {
       if (!framePath) return 'Select a frame image before streaming'
       if (!mediaPath) return 'Select a media video before streaming'
+      if (!overlay || overlay.width < 2 || overlay.height < 2) {
+        return 'Set up the video overlay in the preview before streaming'
+      }
     }
     return null
   }
@@ -58,7 +61,10 @@ export default function StreamControls() {
       mediaStartSeconds: mediaTime,
     }
 
-    if (layoutMode === LAYOUT_MODES.FRAME_MEDIA && overlay) {
+    if (layoutMode === LAYOUT_MODES.FRAME_MEDIA) {
+      if (!overlay || overlay.width < 2 || overlay.height < 2) {
+        return 'Set up the video overlay in the preview before streaming'
+      }
       payload.overlay = toOutputOverlay(overlay, previewSize, resolution)
     }
 
