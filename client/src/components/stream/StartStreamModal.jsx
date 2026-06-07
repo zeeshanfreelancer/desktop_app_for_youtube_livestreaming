@@ -33,7 +33,7 @@ export default function StartStreamModal({ open, onClose, onConfirm }) {
 
         {available.length === 0 ? (
           <p className="mb-4 text-sm text-zinc-400">
-            Add at least one stream key in the settings panel.
+            Add at least one stream key in Stream Settings.
           </p>
         ) : (
           <ul className="mb-4 space-y-2">
