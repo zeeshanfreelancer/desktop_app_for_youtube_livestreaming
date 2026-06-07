@@ -1,0 +1,39 @@
+{
+  "name": "youtube-livestream-electron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Electron main process for YouTube Livestream Software",
+  "main": "main/index.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently -k \"npm run dev --prefix ../client\" \"wait-on tcp:5173 && cross-env ELECTRON_DEV=1 electron .\"",
+    "build:client": "npm run build --prefix ../client",
+    "build": "npm run build:client && electron-builder"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^35.0.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "com.youtubestream.app",
+    "productName": "YouTube Stream",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main/**/*",
+      "preload/**/*",
+      "../client/dist/**/*",
+      "node_modules/ffmpeg-static/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

@@ -1,5 +1,8 @@
 node_modules/
+client/node_modules/
+electron/node_modules/
 client/dist/
+electron/release/
 release/
 dist/
 *.log
