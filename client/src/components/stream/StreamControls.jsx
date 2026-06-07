@@ -63,7 +63,8 @@ export default function StreamControls() {
 
     if (layoutMode === LAYOUT_MODES.FRAME_MEDIA) {
       if (!overlay || overlay.width < 2 || overlay.height < 2) {
-        return 'Set up the video overlay in the preview before streaming'
+        setError('Set up the video overlay in the preview before streaming')
+        return
       }
       payload.overlay = toOutputOverlay(overlay, previewSize, resolution)
     }

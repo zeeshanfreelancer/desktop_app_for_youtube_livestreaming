@@ -26,4 +26,11 @@ contextBridge.exposeInMainWorld('api', {
       return () => ipcRenderer.removeListener('stream:status', handler)
     },
   },
+
+  youtube: {
+    connect: () => ipcRenderer.invoke('youtube:connect'),
+    disconnect: () => ipcRenderer.invoke('youtube:disconnect'),
+    status: () => ipcRenderer.invoke('youtube:status'),
+    listStreams: () => ipcRenderer.invoke('youtube:list-streams'),
+  },
 })

@@ -2,9 +2,14 @@ const { ipcMain } = require('electron')
 const fs = require('fs')
 const { FFmpegManager } = require('../services/FFmpegManager.cjs')
 const { loadSettings } = require('../services/SecureStore.cjs')
+const {
+  setupBroadcastsForStream,
+  completeAllBroadcasts,
+} = require('../services/YouTubeBroadcast.cjs')
 
 function registerStreamHandlers(getMainWindow) {
   const ffmpegManager = new FFmpegManager()
+  let activeBroadcastIds = []
 
   ffmpegManager.setStatusCallback((payload) => {
     const win = getMainWindow()
@@ -36,6 +41,31 @@ function registerStreamHandlers(getMainWindow) {
         return { success: false, error: 'Media file not found' }
       }
 
+      if (settings.youtubeTokens && settings.broadcast?.title?.trim()) {
+        const missingStreamIds = (config.selectedKeyIndices || []).filter(
+          (i) => !settings.youtube.streamIds?.[i]?.trim(),
+        )
+
+        if (missingStreamIds.length > 0) {
+          return {
+            success: false,
+            error: 'Link each selected stream key to a YouTube stream in Broadcast Settings',
+          }
+        }
+
+        try {
+          activeBroadcastIds = await setupBroadcastsForStream(
+            config.selectedKeyIndices,
+            settings,
+          )
+        } catch (err) {
+          return {
+            success: false,
+            error: `YouTube broadcast setup failed: ${err.message}`,
+          }
+        }
+      }
+
       ffmpegManager.start({
         ...config,
         streamKeys: keys,
@@ -43,6 +73,10 @@ function registerStreamHandlers(getMainWindow) {
 
       return { success: true }
     } catch (err) {
+      if (activeBroadcastIds.length > 0) {
+        await completeAllBroadcasts(activeBroadcastIds).catch(() => {})
+        activeBroadcastIds = []
+      }
       return { success: false, error: err.message }
     }
   })
@@ -50,6 +84,12 @@ function registerStreamHandlers(getMainWindow) {
   ipcMain.handle('stream:stop', async () => {
     try {
       await ffmpegManager.stop()
+
+      if (activeBroadcastIds.length > 0) {
+        await completeAllBroadcasts(activeBroadcastIds)
+        activeBroadcastIds = []
+      }
+
       return { success: true }
     } catch (err) {
       return { success: false, error: err.message }

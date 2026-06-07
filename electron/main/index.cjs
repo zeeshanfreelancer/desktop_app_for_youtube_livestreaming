@@ -5,6 +5,7 @@ const { registerLocalMediaProtocol } = require('./protocol/localMedia.cjs')
 const { registerFileHandlers } = require('./ipc/files.cjs')
 const { registerSettingsHandlers } = require('./ipc/settings.cjs')
 const { registerStreamHandlers } = require('./ipc/stream.cjs')
+const { registerYouTubeHandlers } = require('./ipc/youtube.cjs')
 
 const useDevServer = process.env.ELECTRON_DEV === '1'
 const distHtml = path.join(__dirname, '../../client/dist/index.html')
@@ -43,6 +44,7 @@ app.whenReady().then(() => {
   registerLocalMediaProtocol()
   registerFileHandlers()
   registerSettingsHandlers()
+  registerYouTubeHandlers()
   registerStreamHandlers(() => mainWindow)
   createWindow()
 

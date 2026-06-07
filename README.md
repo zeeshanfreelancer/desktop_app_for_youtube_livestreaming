@@ -30,6 +30,21 @@ cd ../electron
 npm install
 ```
 
+## Broadcast Settings
+
+Set **title**, **description**, **privacy**, **category**, **tags**, and **made for kids** in the Broadcast Settings panel. Settings are saved locally.
+
+To push metadata to YouTube automatically:
+
+1. Create a **Google Cloud OAuth Desktop client ID** ([Google Cloud Console](https://console.cloud.google.com/))
+2. Enable the **YouTube Data API v3**
+3. Add redirect URI: `http://127.0.0.1:38472/oauth2callback`
+4. Paste the Client ID in the app and click **Connect YouTube Account**
+5. Link each stream key to a YouTube stream from the dropdown
+6. Start streaming — the app creates and binds a YouTube broadcast before RTMP ingest
+
+Without YouTube API connection, RTMP streaming still works but metadata must be set manually in YouTube Studio.
+
 ## Development
 
 From the `electron` folder:
