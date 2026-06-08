@@ -11,6 +11,8 @@ export function AppProvider({ children }) {
   const [streams, setStreams] = useState(createDefaultStreams)
   const [activeSlot, setActiveSlotState] = useState(0)
   const [overlay, setOverlay] = useState(null)
+  const [frameUrl, setFrameUrl] = useState(null)
+  const [mediaUrl, setMediaUrl] = useState(null)
   const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 })
   const [youtubeClientId, setYoutubeClientId] = useState('')
   const [youtubeConnected, setYoutubeConnected] = useState(false)
@@ -20,8 +22,25 @@ export function AppProvider({ children }) {
   const [mediaTime, setMediaTime] = useState(0)
   const [mediaDuration, setMediaDuration] = useState(0)
   const videoRef = useRef(null)
+  const userEditedRef = useRef(false)
+  const streamsRef = useRef(streams)
+  const activeSlotRef = useRef(activeSlot)
+  const youtubeClientIdRef = useRef(youtubeClientId)
 
-  const activeStream = streams[activeSlot] || streams[0]
+  streamsRef.current = streams
+  activeSlotRef.current = activeSlot
+  youtubeClientIdRef.current = youtubeClientId
+
+  const activeStream = streams[activeSlot] || streams[0] || createDefaultStreams()[0]
+
+  const saveStreams = useCallback((nextStreams, slot = activeSlotRef.current) => {
+    if (!isElectron) return
+    window.api.settings.save({
+      streams: nextStreams,
+      youtube: { clientId: youtubeClientIdRef.current },
+      activeSlot: slot,
+    }).catch(() => {})
+  }, [])
 
   const refreshYouTubeStatus = useCallback(async () => {
     if (!isElectron) return
@@ -57,6 +76,7 @@ export function AppProvider({ children }) {
     if (!isElectron) return
 
     window.api.settings.load().then((settings) => {
+      if (userEditedRef.current) return
       setStreams(settings.streams || createDefaultStreams())
       setActiveSlotState(settings.activeSlot ?? 0)
       setYoutubeClientId(settings.youtube?.clientId || '')
@@ -95,63 +115,125 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     setMediaTime(activeStream.mediaStartSeconds || 0)
+    setOverlay(null)
   }, [activeSlot, activeStream.mediaStartSeconds])
 
-  const persistSettings = useCallback((partial) => {
-    if (!isElectron) return
-    window.api.settings.save({
-      streams: partial.streams ?? streams,
-      youtube: partial.youtube ?? { clientId: youtubeClientId },
-      activeSlot: partial.activeSlot ?? activeSlot,
+  useEffect(() => {
+    if (!isElectron || !activeStream.framePath) {
+      setFrameUrl(null)
+      return
+    }
+
+    let cancelled = false
+    window.api.files.toPreviewUrl(activeStream.framePath).then((url) => {
+      if (!cancelled) setFrameUrl(url)
+    }).catch(() => {
+      if (!cancelled) setFrameUrl(null)
     })
-  }, [streams, youtubeClientId, activeSlot])
+
+    return () => { cancelled = true }
+  }, [activeStream.framePath])
+
+  useEffect(() => {
+    if (!isElectron || !activeStream.mediaPath) {
+      setMediaUrl(null)
+      return
+    }
+
+    let cancelled = false
+    window.api.files.toPreviewUrl(activeStream.mediaPath).then((url) => {
+      if (!cancelled) setMediaUrl(url)
+    }).catch(() => {
+      if (!cancelled) setMediaUrl(null)
+    })
+
+    return () => { cancelled = true }
+  }, [activeStream.mediaPath])
 
   const updateStreamSlot = useCallback((index, partial) => {
+    userEditedRef.current = true
     setStreams((prev) => {
       const next = [...prev]
       next[index] = { ...next[index], ...partial }
-      persistSettings({ streams: next })
+      saveStreams(next)
       return next
     })
-  }, [persistSettings])
+  }, [saveStreams])
 
   const updateStreamBroadcast = useCallback((index, partial) => {
+    userEditedRef.current = true
     setStreams((prev) => {
       const next = [...prev]
       next[index] = {
         ...next[index],
         broadcast: { ...next[index].broadcast, ...partial },
       }
-      persistSettings({ streams: next })
+      saveStreams(next)
       return next
     })
-  }, [persistSettings])
+  }, [saveStreams])
 
   const setActiveSlot = useCallback((index) => {
     setActiveSlotState(index)
     setOverlay(null)
-    persistSettings({ activeSlot: index })
-  }, [persistSettings])
+    saveStreams(streamsRef.current, index)
+  }, [saveStreams])
 
-  const selectFrame = useCallback(async (slotIndex = activeSlot) => {
+  const selectFrame = useCallback(async (slotIndex = activeSlotRef.current) => {
     if (!isElectron) return
-    const path = await window.api.files.openImage()
-    if (!path) return
-    updateStreamSlot(slotIndex, { framePath: path })
-  }, [activeSlot, updateStreamSlot])
+    const filePath = await window.api.files.openImage()
+    if (!filePath) return
 
-  const selectMedia = useCallback(async (slotIndex = activeSlot) => {
+    userEditedRef.current = true
+    setStreams((prev) => {
+      const slot = prev[slotIndex]
+      if (!slot) return prev
+
+      let layoutMode = slot.layoutMode
+      if (layoutMode === LAYOUT_MODES.MEDIA_ONLY) {
+        layoutMode = slot.mediaPath ? LAYOUT_MODES.FRAME_MEDIA : LAYOUT_MODES.FRAME_ONLY
+      }
+
+      const next = [...prev]
+      next[slotIndex] = { ...slot, framePath: filePath, layoutMode }
+      saveStreams(next)
+      return next
+    })
+  }, [saveStreams])
+
+  const selectMedia = useCallback(async (slotIndex = activeSlotRef.current) => {
     if (!isElectron) return
-    const path = await window.api.files.openVideo()
-    if (!path) return
-    updateStreamSlot(slotIndex, { mediaPath: path, mediaStartSeconds: 0 })
+    const filePath = await window.api.files.openVideo()
+    if (!filePath) return
+
+    userEditedRef.current = true
+    setStreams((prev) => {
+      const slot = prev[slotIndex]
+      if (!slot) return prev
+
+      let layoutMode = slot.layoutMode
+      if (layoutMode === LAYOUT_MODES.FRAME_ONLY) {
+        layoutMode = slot.framePath ? LAYOUT_MODES.FRAME_MEDIA : LAYOUT_MODES.MEDIA_ONLY
+      }
+
+      const next = [...prev]
+      next[slotIndex] = { ...slot, mediaPath: filePath, mediaStartSeconds: 0, layoutMode }
+      saveStreams(next)
+      return next
+    })
     setMediaTime(0)
-  }, [activeSlot, updateStreamSlot])
+  }, [saveStreams])
 
   const updateYoutubeClientId = useCallback((value) => {
     setYoutubeClientId(value)
-    persistSettings({ youtube: { clientId: value } })
-  }, [persistSettings])
+    if (isElectron) {
+      window.api.settings.save({
+        streams: streamsRef.current,
+        youtube: { clientId: value },
+        activeSlot: activeSlotRef.current,
+      }).catch(() => {})
+    }
+  }, [])
 
   const connectYouTube = useCallback(async () => {
     if (!isElectron) return { success: false }
@@ -172,21 +254,22 @@ export function AppProvider({ children }) {
     setYoutubeStreams([])
   }, [])
 
-  const saveOverlayToActiveSlot = useCallback((pixelOverlay) => {
+  const setOverlayLocal = useCallback((pixelOverlay) => {
+    setOverlay(pixelOverlay)
+  }, [])
+
+  const persistOverlay = useCallback((pixelOverlay) => {
     if (!pixelOverlay || !previewSize.width) return
     const normalized = overlayToNormalized(pixelOverlay, previewSize)
-    updateStreamSlot(activeSlot, { overlay: normalized })
-  }, [activeSlot, previewSize, updateStreamSlot])
-
-  const setOverlayPixels = useCallback((pixelOverlay) => {
-    setOverlay(pixelOverlay)
-    saveOverlayToActiveSlot(pixelOverlay)
-  }, [saveOverlayToActiveSlot])
+    updateStreamSlot(activeSlotRef.current, { overlay: normalized })
+  }, [previewSize, updateStreamSlot])
 
   const initOverlay = useCallback((containerWidth, containerHeight) => {
-    const size = { width: containerWidth, height: containerHeight }
     const normalized = activeStream.overlay || DEFAULT_OVERLAY
-    const pixels = overlayFromNormalized(normalized, size)
+    const pixels = overlayFromNormalized(normalized, {
+      width: containerWidth,
+      height: containerHeight,
+    })
     if (pixels) setOverlay(pixels)
   }, [activeStream.overlay])
 
@@ -202,17 +285,9 @@ export function AppProvider({ children }) {
     if (videoRef.current) {
       videoRef.current.currentTime = time
       setMediaTime(time)
-      updateStreamSlot(activeSlot, { mediaStartSeconds: time })
+      updateStreamSlot(activeSlotRef.current, { mediaStartSeconds: time })
     }
-  }, [activeSlot, updateStreamSlot])
-
-  const frameUrl = activeStream.framePath && isElectron
-    ? window.api.toFileUrl(activeStream.framePath)
-    : null
-
-  const mediaUrl = activeStream.mediaPath && isElectron
-    ? window.api.toFileUrl(activeStream.mediaPath)
-    : null
+  }, [updateStreamSlot])
 
   const value = useMemo(() => ({
     streams,
@@ -228,7 +303,8 @@ export function AppProvider({ children }) {
     layoutMode: activeStream.layoutMode,
     setLayoutMode: (mode) => updateStreamSlot(activeSlot, { layoutMode: mode }),
     overlay,
-    setOverlay: setOverlayPixels,
+    setOverlayLocal,
+    persistOverlay,
     previewSize,
     setPreviewSize,
     liveStreams,
@@ -258,7 +334,7 @@ export function AppProvider({ children }) {
     youtubeStreams, mediaTime, mediaDuration, playMedia, pauseMedia, seekMedia,
     selectFrame, selectMedia, connectYouTube, disconnectYouTube,
     refreshYouTubeStreams, initOverlay, setActiveSlot, updateStreamSlot,
-    updateStreamBroadcast, setOverlayPixels,
+    updateStreamBroadcast, setOverlayLocal, persistOverlay,
   ])
 
   return (

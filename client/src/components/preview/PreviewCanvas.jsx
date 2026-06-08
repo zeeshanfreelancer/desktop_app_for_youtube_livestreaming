@@ -10,7 +10,8 @@ export default function PreviewCanvas() {
     mediaUrl,
     layoutMode,
     overlay,
-    setOverlay,
+    setOverlayLocal,
+    persistOverlay,
     setPreviewSize,
     initOverlay,
     setMediaTime,
@@ -18,6 +19,7 @@ export default function PreviewCanvas() {
     videoRef,
     activeSlot,
     activeStream,
+    previewSize,
   } = useApp()
 
   useEffect(() => {
@@ -26,18 +28,19 @@ export default function PreviewCanvas() {
 
     const updateSize = () => {
       const rect = el.getBoundingClientRect()
-      const size = { width: rect.width, height: rect.height }
-      setPreviewSize(size)
-      if (size.width > 0) {
-        initOverlay(size.width, size.height)
-      }
+      setPreviewSize({ width: rect.width, height: rect.height })
     }
 
     updateSize()
     const observer = new ResizeObserver(updateSize)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [activeSlot, initOverlay, setPreviewSize])
+  }, [setPreviewSize])
+
+  useEffect(() => {
+    if (!previewSize.width || !previewSize.height) return
+    initOverlay(previewSize.width, previewSize.height)
+  }, [activeSlot, activeStream.overlay, previewSize.width, previewSize.height, initOverlay])
 
   useEffect(() => {
     const video = videoRef.current
@@ -58,16 +61,16 @@ export default function PreviewCanvas() {
   const showMedia = layoutMode === LAYOUT_MODES.MEDIA_ONLY || layoutMode === LAYOUT_MODES.FRAME_MEDIA
   const mediaFullscreen = layoutMode === LAYOUT_MODES.MEDIA_ONLY
   const containerSize = {
-    width: containerRef.current?.clientWidth || 0,
-    height: containerRef.current?.clientHeight || 0,
+    width: previewSize.width || containerRef.current?.clientWidth || 0,
+    height: previewSize.height || containerRef.current?.clientHeight || 0,
   }
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center bg-zinc-900 p-6">
+    <main className="flex min-h-0 flex-1 flex-col items-center justify-center bg-zinc-900 p-6">
       <div className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-400">
         <span>Live Preview</span>
         <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
-          {activeStream.name}
+          {activeStream?.name || 'Stream'}
         </span>
       </div>
       <div
@@ -76,6 +79,7 @@ export default function PreviewCanvas() {
       >
         {showFrame && frameUrl && (
           <img
+            key={frameUrl}
             src={frameUrl}
             alt="Frame background"
             className="absolute inset-0 h-full w-full object-cover"
@@ -91,24 +95,29 @@ export default function PreviewCanvas() {
 
         {showMedia && mediaUrl && mediaFullscreen && (
           <video
+            key={mediaUrl}
             ref={videoRef}
             src={mediaUrl}
             className="absolute inset-0 h-full w-full object-cover"
             playsInline
+            preload="metadata"
           />
         )}
 
         {showMedia && mediaUrl && !mediaFullscreen && overlay && (
           <DraggableOverlay
             overlay={overlay}
-            setOverlay={setOverlay}
+            setOverlay={setOverlayLocal}
+            onPersist={persistOverlay}
             containerSize={containerSize}
           >
             <video
+              key={mediaUrl}
               ref={videoRef}
               src={mediaUrl}
               className="h-full w-full object-cover"
               playsInline
+              preload="metadata"
             />
           </DraggableOverlay>
         )}

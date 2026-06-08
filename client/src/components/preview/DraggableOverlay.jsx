@@ -3,9 +3,18 @@ import { clampOverlay } from '../../utils/coordinates'
 
 const MIN_SIZE = 80
 
-export default function DraggableOverlay({ children, overlay, setOverlay, containerSize }) {
+export default function DraggableOverlay({
+  children,
+  overlay,
+  setOverlay,
+  onPersist,
+  containerSize,
+}) {
   const dragRef = useRef(null)
+  const overlayRef = useRef(overlay)
   const [action, setAction] = useState(null)
+
+  overlayRef.current = overlay
 
   const onPointerDownDrag = useCallback((e) => {
     e.preventDefault()
@@ -53,7 +62,10 @@ export default function DraggableOverlay({ children, overlay, setOverlay, contai
       }
     }
 
-    const onUp = () => setAction(null)
+    const onUp = () => {
+      setAction(null)
+      onPersist?.(overlayRef.current)
+    }
 
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -61,7 +73,7 @@ export default function DraggableOverlay({ children, overlay, setOverlay, contai
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
     }
-  }, [action, containerSize, setOverlay])
+  }, [action, containerSize, setOverlay, onPersist])
 
   if (!overlay) return null
 
