@@ -111,7 +111,7 @@ export default function StreamSlotSettings({ slotIndex }) {
             placeholder="Tags (comma-separated)"
             className={inputClass}
           />
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
             <input
               type="checkbox"
               checked={slot.broadcast.madeForKids}
@@ -127,7 +127,7 @@ export default function StreamSlotSettings({ slotIndex }) {
         <h3 className="mb-2 text-xs font-semibold uppercase text-zinc-500">Output</h3>
         <div className="space-y-2">
           {Object.entries(RESOLUTIONS).map(([key, { label }]) => (
-            <label key={key} className="flex items-center gap-2 text-sm">
+            <label key={key} className="flex cursor-pointer items-center gap-2 text-sm">
               <input
                 type="radio"
                 name={`resolution-${slotIndex}`}

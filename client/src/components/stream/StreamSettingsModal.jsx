@@ -90,12 +90,12 @@ export default function StreamSettingsModal({ open, onClose, initialSlot = 0 }) 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex cursor-pointer items-center justify-center bg-black/70 p-4"
       onClick={onClose}
       role="presentation"
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-lg border border-zinc-600 bg-zinc-900 shadow-xl"
+        className="flex max-h-[90vh] w-full max-w-2xl cursor-default flex-col rounded-lg border border-zinc-600 bg-zinc-900 shadow-xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
