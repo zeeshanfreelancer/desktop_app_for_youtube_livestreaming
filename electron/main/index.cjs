@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, Menu } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const { registerLocalMediaProtocol } = require('./protocol/localMedia.cjs')
@@ -19,6 +19,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     title: 'YouTube Stream',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -26,6 +27,8 @@ function createWindow() {
       sandbox: false,
     },
   })
+
+  mainWindow.setMenuBarVisibility(false)
 
   if (useDevServer) {
     mainWindow.loadURL('http://localhost:5173')
@@ -41,6 +44,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   registerLocalMediaProtocol()
   createWindow()
   registerFileHandlers(() => mainWindow)
