@@ -260,6 +260,49 @@ export function AppProvider({ children }) {
     }
   }, [commitStreams])
 
+  const clearFrame = useCallback((slotIndex = activeSlotRef.current) => {
+    userEditedRef.current = true
+    const prev = streamsRef.current
+    const slot = prev[slotIndex]
+    if (!slot) return
+
+    let layoutMode = slot.layoutMode
+    if (layoutMode === LAYOUT_MODES.FRAME_MEDIA) {
+      layoutMode = slot.mediaPath ? LAYOUT_MODES.MEDIA_ONLY : LAYOUT_MODES.FRAME_ONLY
+    }
+
+    const next = [...prev]
+    next[slotIndex] = { ...slot, framePath: '', layoutMode }
+    commitStreams(next)
+
+    if (slotIndex === activeSlotRef.current) {
+      setFrameUrl(null)
+    }
+  }, [commitStreams])
+
+  const clearMedia = useCallback((slotIndex = activeSlotRef.current) => {
+    userEditedRef.current = true
+    const prev = streamsRef.current
+    const slot = prev[slotIndex]
+    if (!slot) return
+
+    let layoutMode = slot.layoutMode
+    if (layoutMode === LAYOUT_MODES.FRAME_MEDIA) {
+      layoutMode = slot.framePath ? LAYOUT_MODES.FRAME_ONLY : LAYOUT_MODES.MEDIA_ONLY
+    }
+
+    const next = [...prev]
+    next[slotIndex] = { ...slot, mediaPath: '', mediaStartSeconds: 0, layoutMode }
+    commitStreams(next)
+
+    if (slotIndex === activeSlotRef.current) {
+      videoRef.current?.pause()
+      setMediaUrl(null)
+      setMediaTime(0)
+      setMediaDuration(0)
+    }
+  }, [commitStreams])
+
   const updateYoutubeClientId = useCallback((value) => {
     setYoutubeClientId(value)
     youtubeClientIdRef.current = value
@@ -360,6 +403,8 @@ export function AppProvider({ children }) {
     seekMedia,
     selectFrame,
     selectMedia,
+    clearFrame,
+    clearMedia,
     connectYouTube,
     disconnectYouTube,
     refreshYouTubeStreams,
@@ -370,7 +415,7 @@ export function AppProvider({ children }) {
     streams, activeSlot, activeStream, settingsReady, liveStreams, overlay, previewSize,
     frameUrl, mediaUrl, youtubeClientId, youtubeConnected, youtubeChannelTitle,
     youtubeStreams, mediaTime, mediaDuration, playMedia, pauseMedia, seekMedia,
-    selectFrame, selectMedia, connectYouTube, disconnectYouTube,
+    selectFrame, selectMedia, clearFrame, clearMedia, connectYouTube, disconnectYouTube,
     refreshYouTubeStreams, initOverlay, setActiveSlot, updateStreamSlot,
     updateStreamBroadcast, setOverlayLocal, persistOverlay,
   ])

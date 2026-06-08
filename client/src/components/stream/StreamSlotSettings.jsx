@@ -18,6 +18,8 @@ export default function StreamSlotSettings({ slotIndex }) {
     youtubeConnected,
     selectFrame,
     selectMedia,
+    clearFrame,
+    clearMedia,
     activeSlot,
   } = useApp()
 
@@ -169,29 +171,76 @@ export default function StreamSlotSettings({ slotIndex }) {
             </button>
           ))}
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => selectFrame(slotIndex)}
-            className="flex-1 rounded-md bg-zinc-700 px-2 py-1.5 text-xs hover:bg-zinc-600"
-          >
-            Frame
-          </button>
-          <button
-            type="button"
-            onClick={() => selectMedia(slotIndex)}
-            className="flex-1 rounded-md bg-zinc-700 px-2 py-1.5 text-xs hover:bg-zinc-600"
-          >
-            Media
-          </button>
-        </div>
-        <div className="mt-2 space-y-1 text-xs">
-          <p className={slot.framePath ? 'text-emerald-400' : 'text-zinc-500'}>
-            Frame: {fileBaseName(slot.framePath) || 'Not selected'}
-          </p>
-          <p className={slot.mediaPath ? 'text-emerald-400' : 'text-zinc-500'}>
-            Media: {fileBaseName(slot.mediaPath) || 'Not selected'}
-          </p>
+        <div className="space-y-2">
+          <div className="rounded-md bg-zinc-900/80 p-2">
+            <p className="mb-1 text-xs text-zinc-500">Frame image</p>
+            {slot.framePath ? (
+              <>
+                <p className="truncate text-xs font-medium text-emerald-400" title={slot.framePath}>
+                  {fileBaseName(slot.framePath)}
+                </p>
+                <div className="mt-1.5 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => selectFrame(slotIndex)}
+                    className="flex-1 rounded bg-zinc-700 px-2 py-1 text-xs hover:bg-zinc-600"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => clearFrame(slotIndex)}
+                    className="flex-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 hover:bg-red-900/50 hover:text-red-200"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => selectFrame(slotIndex)}
+                className="w-full rounded bg-zinc-700 px-2 py-1.5 text-xs hover:bg-zinc-600"
+              >
+                Select frame
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-md bg-zinc-900/80 p-2">
+            <p className="mb-1 text-xs text-zinc-500">Media video</p>
+            {slot.mediaPath ? (
+              <>
+                <p className="truncate text-xs font-medium text-emerald-400" title={slot.mediaPath}>
+                  {fileBaseName(slot.mediaPath)}
+                </p>
+                <div className="mt-1.5 flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => selectMedia(slotIndex)}
+                    className="flex-1 rounded bg-zinc-700 px-2 py-1 text-xs hover:bg-zinc-600"
+                  >
+                    Change
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => clearMedia(slotIndex)}
+                    className="flex-1 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400 hover:bg-red-900/50 hover:text-red-200"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => selectMedia(slotIndex)}
+                className="w-full rounded bg-zinc-700 px-2 py-1.5 text-xs hover:bg-zinc-600"
+              >
+                Select media
+              </button>
+            )}
+          </div>
         </div>
         {slotIndex === activeSlot && slot.layoutMode === LAYOUT_MODES.FRAME_MEDIA && (
           <p className="mt-1 text-xs text-amber-500/80">

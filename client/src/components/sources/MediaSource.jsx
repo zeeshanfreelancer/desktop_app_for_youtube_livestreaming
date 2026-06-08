@@ -1,10 +1,12 @@
 import { useApp } from '../../context/AppContext'
 import { fileBaseName } from '../../utils/fileDisplay'
+import SelectedFileCard from './SelectedFileCard'
 
 export default function MediaSource() {
   const {
     mediaPath,
     selectMedia,
+    clearMedia,
     mediaTime,
     mediaDuration,
     playMedia,
@@ -19,22 +21,26 @@ export default function MediaSource() {
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
         Media Source
       </h2>
-      <button
-        type="button"
-        onClick={() => selectMedia()}
-        className="w-full rounded-md bg-zinc-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-600"
-      >
-        Select Video
-      </button>
+
       {fileName ? (
-        <div className="mt-2 rounded-md bg-emerald-950/40 px-2 py-1.5">
-          <p className="text-xs text-emerald-400">Selected</p>
-          <p className="truncate text-sm font-medium text-white" title={mediaPath}>
-            {fileName}
-          </p>
-        </div>
+        <SelectedFileCard
+          fileName={fileName}
+          filePath={mediaPath}
+          onChange={() => selectMedia()}
+          onRemove={() => clearMedia()}
+          changeLabel="Change Video"
+        />
       ) : (
-        <p className="mt-2 text-xs text-zinc-500">MP4 — manual playback only</p>
+        <>
+          <button
+            type="button"
+            onClick={() => selectMedia()}
+            className="w-full rounded-md bg-zinc-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-600"
+          >
+            Select Video
+          </button>
+          <p className="mt-2 text-xs text-zinc-500">MP4 — manual playback only</p>
+        </>
       )}
 
       {fileName && (
