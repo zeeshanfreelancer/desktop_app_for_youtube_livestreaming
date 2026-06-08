@@ -18,7 +18,7 @@ export default function FrameSource() {
           filePath={framePath}
           onChange={() => selectFrame()}
           onRemove={() => clearFrame()}
-          changeLabel="Change Image"
+          changeLabel="Change"
         />
       ) : (
         <>

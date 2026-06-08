@@ -193,15 +193,15 @@ export default function StreamDashboard({ onOpenSettings }) {
           type="button"
           onClick={handleStartSelected}
           disabled={selected.length === 0}
-          className="flex-1 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:opacity-50"
+          className="min-w-0 flex-1 rounded-md bg-red-600 px-2 py-1.5 text-[10px] font-semibold leading-tight whitespace-nowrap text-white hover:bg-red-500 disabled:opacity-50"
         >
-          Start Selected ({selected.length})
+          Start ({selected.length})
         </button>
         <button
           type="button"
           onClick={handleStopAll}
           disabled={liveCount === 0}
-          className="flex-1 rounded-md bg-zinc-700 px-3 py-2 text-sm font-semibold text-white hover:bg-zinc-600 disabled:opacity-50"
+          className="min-w-0 flex-1 rounded-md bg-zinc-700 px-2 py-1.5 text-[10px] font-semibold leading-tight whitespace-nowrap text-white hover:bg-zinc-600 disabled:opacity-50"
         >
           Stop All
         </button>

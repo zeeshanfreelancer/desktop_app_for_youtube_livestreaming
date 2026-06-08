@@ -28,7 +28,7 @@ export default function MediaSource() {
           filePath={mediaPath}
           onChange={() => selectMedia()}
           onRemove={() => clearMedia()}
-          changeLabel="Change Video"
+          changeLabel="Change"
         />
       ) : (
         <>
