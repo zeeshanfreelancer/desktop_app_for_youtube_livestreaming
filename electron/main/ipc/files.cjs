@@ -8,11 +8,21 @@ const IMAGE_MIME = {
   '.jpeg': 'image/jpeg',
 }
 
+const VIDEO_EXTENSIONS = new Set(['.mp4', '.webm', '.mov', '.m4v', '.mkv'])
+
 const MAX_IMAGE_DATA_URL_BYTES = 20 * 1024 * 1024
 
-function registerFileHandlers() {
+function registerFileHandlers(getMainWindow) {
+  const openDialog = (options) => {
+    const win = getMainWindow?.()
+    if (win && !win.isDestroyed()) {
+      return dialog.showOpenDialog(win, options)
+    }
+    return dialog.showOpenDialog(options)
+  }
+
   ipcMain.handle('files:open-image', async () => {
-    const result = await dialog.showOpenDialog({
+    const result = await openDialog({
       title: 'Select Frame Image',
       properties: ['openFile'],
       filters: [
@@ -28,11 +38,12 @@ function registerFileHandlers() {
   })
 
   ipcMain.handle('files:open-video', async () => {
-    const result = await dialog.showOpenDialog({
+    const result = await openDialog({
       title: 'Select Media Video',
       properties: ['openFile'],
       filters: [
-        { name: 'Videos', extensions: ['mp4'] },
+        { name: 'Videos', extensions: ['mp4', 'webm', 'mov', 'm4v', 'mkv'] },
+        { name: 'All files', extensions: ['*'] },
       ],
     })
 
@@ -53,7 +64,7 @@ function registerFileHandlers() {
     if (IMAGE_MIME[ext]) {
       const stat = fs.statSync(filePath)
       if (stat.size > MAX_IMAGE_DATA_URL_BYTES) {
-        return `local-media://load?path=${encodeURIComponent(filePath)}`
+        return `local-media://file?path=${encodeURIComponent(filePath)}`
       }
 
       const data = await fs.promises.readFile(filePath)
@@ -61,8 +72,8 @@ function registerFileHandlers() {
       return `data:${mime};base64,${data.toString('base64')}`
     }
 
-    if (ext === '.mp4') {
-      return `local-media://load?path=${encodeURIComponent(filePath)}`
+    if (VIDEO_EXTENSIONS.has(ext)) {
+      return `local-media://file?path=${encodeURIComponent(filePath)}`
     }
 
     return null

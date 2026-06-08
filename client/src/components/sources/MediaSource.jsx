@@ -1,4 +1,5 @@
 import { useApp } from '../../context/AppContext'
+import { fileBaseName } from '../../utils/fileDisplay'
 
 export default function MediaSource() {
   const {
@@ -11,6 +12,8 @@ export default function MediaSource() {
     seekMedia,
   } = useApp()
 
+  const fileName = fileBaseName(mediaPath)
+
   return (
     <section className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-4">
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-zinc-400">
@@ -18,16 +21,23 @@ export default function MediaSource() {
       </h2>
       <button
         type="button"
-        onClick={selectMedia}
+        onClick={() => selectMedia()}
         className="w-full rounded-md bg-zinc-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-600"
       >
         Select Video
       </button>
-      <p className="mt-2 truncate text-xs text-zinc-500">
-        {mediaPath ? mediaPath.split(/[/\\]/).pop() : 'MP4 — manual playback only'}
-      </p>
+      {fileName ? (
+        <div className="mt-2 rounded-md bg-emerald-950/40 px-2 py-1.5">
+          <p className="text-xs text-emerald-400">Selected</p>
+          <p className="truncate text-sm font-medium text-white" title={mediaPath}>
+            {fileName}
+          </p>
+        </div>
+      ) : (
+        <p className="mt-2 text-xs text-zinc-500">MP4 — manual playback only</p>
+      )}
 
-      {mediaPath && (
+      {fileName && (
         <div className="mt-3 space-y-2">
           <div className="flex gap-2">
             <button

@@ -42,11 +42,11 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerLocalMediaProtocol()
-  registerFileHandlers()
+  createWindow()
+  registerFileHandlers(() => mainWindow)
   registerSettingsHandlers()
   registerYouTubeHandlers()
   registerStreamHandlers(() => mainWindow)
-  createWindow()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

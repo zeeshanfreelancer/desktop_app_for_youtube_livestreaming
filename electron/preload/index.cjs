@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('api', {
   toFileUrl: (filePath) => {
     if (!filePath) return null
-    return `local-media://load?path=${encodeURIComponent(filePath)}`
+    return `local-media://file?path=${encodeURIComponent(filePath)}`
   },
 
   files: {

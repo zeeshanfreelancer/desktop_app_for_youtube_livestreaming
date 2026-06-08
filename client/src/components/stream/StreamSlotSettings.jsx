@@ -1,4 +1,5 @@
 import { useApp } from '../../context/AppContext'
+import { fileBaseName } from '../../utils/fileDisplay'
 import { PRIVACY_OPTIONS, YOUTUBE_CATEGORIES } from '../../utils/broadcastDefaults'
 import { LAYOUT_MODE_LABELS, LAYOUT_MODES, RESOLUTIONS } from '../../utils/layoutModes'
 
@@ -184,11 +185,14 @@ export default function StreamSlotSettings({ slotIndex }) {
             Media
           </button>
         </div>
-        <p className="mt-2 truncate text-xs text-zinc-500">
-          {slot.framePath ? slot.framePath.split(/[/\\]/).pop() : 'No frame'}
-          {' · '}
-          {slot.mediaPath ? slot.mediaPath.split(/[/\\]/).pop() : 'No media'}
-        </p>
+        <div className="mt-2 space-y-1 text-xs">
+          <p className={slot.framePath ? 'text-emerald-400' : 'text-zinc-500'}>
+            Frame: {fileBaseName(slot.framePath) || 'Not selected'}
+          </p>
+          <p className={slot.mediaPath ? 'text-emerald-400' : 'text-zinc-500'}>
+            Media: {fileBaseName(slot.mediaPath) || 'Not selected'}
+          </p>
+        </div>
         {slotIndex === activeSlot && slot.layoutMode === LAYOUT_MODES.FRAME_MEDIA && (
           <p className="mt-1 text-xs text-amber-500/80">
             Drag the video overlay in the preview to set PiP position for this stream.

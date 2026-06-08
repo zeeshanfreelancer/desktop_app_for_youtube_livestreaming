@@ -127,15 +127,18 @@ function migrateLegacyStreams(raw) {
 function normalizeSettings(raw = {}) {
   if (Array.isArray(raw.streams) && raw.streams.length === STREAM_COUNT) {
     return {
-      streams: raw.streams.map((slot, i) => ({
-        ...createDefaultStreamSlot(i),
-        ...slot,
-        streamKey: slot.streamKeyEncrypted
-          ? decryptValue(slot.streamKeyEncrypted)
-          : (slot.streamKey || ''),
-        broadcast: { ...DEFAULT_BROADCAST, ...(slot.broadcast || {}) },
-        overlay: { ...DEFAULT_OVERLAY, ...(slot.overlay || {}) },
-      })),
+      streams: raw.streams.map((slot, i) => {
+        const { streamKeyEncrypted, streamKey, ...rest } = slot
+        return {
+          ...createDefaultStreamSlot(i),
+          ...rest,
+          streamKey: streamKeyEncrypted
+            ? decryptValue(streamKeyEncrypted)
+            : (streamKey || ''),
+          broadcast: { ...DEFAULT_BROADCAST, ...(slot.broadcast || {}) },
+          overlay: { ...DEFAULT_OVERLAY, ...(slot.overlay || {}) },
+        }
+      }),
       youtube: { ...DEFAULT_YOUTUBE, ...(raw.youtube || {}) },
       youtubeTokens: decryptJson(raw.youtubeTokensEncrypted),
       activeSlot: raw.activeSlot ?? 0,
@@ -150,8 +153,17 @@ function normalizeSettings(raw = {}) {
   }
 }
 
+function normalizeClientStreamSlot(slot, index) {
+  const { streamKey, streamKeyEncrypted, ...rest } = slot
+  return {
+    ...createDefaultStreamSlot(index),
+    ...rest,
+    streamKey: streamKey || '',
+  }
+}
+
 function serializeStreamSlot(slot) {
-  const { streamKey, ...rest } = slot
+  const { streamKey, streamKeyEncrypted, ...rest } = slot
   return {
     ...rest,
     streamKeyEncrypted: encryptValue(streamKey || ''),
@@ -176,13 +188,9 @@ function saveSettings(partial) {
   const current = loadSettings()
   const filePath = getSettingsPath()
 
-  const streams = (partial.streams ?? current.streams).map((slot, i) => {
-    const merged = { ...current.streams[i], ...slot }
-    return {
-      ...merged,
-      streamKey: slot.streamKey !== undefined ? slot.streamKey : current.streams[i].streamKey,
-    }
-  })
+  const streams = Array.isArray(partial.streams) && partial.streams.length === STREAM_COUNT
+    ? partial.streams.map((slot, i) => normalizeClientStreamSlot(slot, i))
+    : current.streams
 
   const payload = {
     streams: streams.map(serializeStreamSlot),

@@ -10,6 +10,7 @@ const isElectron = typeof window !== 'undefined' && window.api
 export function AppProvider({ children }) {
   const [streams, setStreams] = useState(createDefaultStreams)
   const [activeSlot, setActiveSlotState] = useState(0)
+  const [settingsReady, setSettingsReady] = useState(!isElectron)
   const [overlay, setOverlay] = useState(null)
   const [frameUrl, setFrameUrl] = useState(null)
   const [mediaUrl, setMediaUrl] = useState(null)
@@ -34,13 +35,19 @@ export function AppProvider({ children }) {
   const activeStream = streams[activeSlot] || streams[0] || createDefaultStreams()[0]
 
   const saveStreams = useCallback((nextStreams, slot = activeSlotRef.current) => {
-    if (!isElectron) return
-    window.api.settings.save({
+    if (!isElectron) return Promise.resolve()
+    return window.api.settings.save({
       streams: nextStreams,
       youtube: { clientId: youtubeClientIdRef.current },
       activeSlot: slot,
     }).catch(() => {})
   }, [])
+
+  const commitStreams = useCallback((nextStreams) => {
+    streamsRef.current = nextStreams
+    setStreams(nextStreams)
+    saveStreams(nextStreams)
+  }, [saveStreams])
 
   const refreshYouTubeStatus = useCallback(async () => {
     if (!isElectron) return
@@ -75,12 +82,22 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!isElectron) return
 
+    let cancelled = false
+
     window.api.settings.load().then((settings) => {
-      if (userEditedRef.current) return
-      setStreams(settings.streams || createDefaultStreams())
+      if (cancelled || userEditedRef.current) {
+        setSettingsReady(true)
+        return
+      }
+      const loaded = settings.streams || createDefaultStreams()
+      streamsRef.current = loaded
+      setStreams(loaded)
       setActiveSlotState(settings.activeSlot ?? 0)
       setYoutubeClientId(settings.youtube?.clientId || '')
       setYoutubeConnected(Boolean(settings.youtubeConnected))
+      setSettingsReady(true)
+    }).catch(() => {
+      if (!cancelled) setSettingsReady(true)
     })
 
     refreshYouTubeStatus()
@@ -110,13 +127,19 @@ export function AppProvider({ children }) {
       }))
     })
 
-    return unsubscribe
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
   }, [refreshYouTubeStatus, refreshActiveStreams])
 
   useEffect(() => {
     setMediaTime(activeStream.mediaStartSeconds || 0)
-    setOverlay(null)
   }, [activeSlot, activeStream.mediaStartSeconds])
+
+  useEffect(() => {
+    setOverlay(null)
+  }, [activeSlot])
 
   useEffect(() => {
     if (!isElectron || !activeStream.framePath) {
@@ -152,80 +175,94 @@ export function AppProvider({ children }) {
 
   const updateStreamSlot = useCallback((index, partial) => {
     userEditedRef.current = true
-    setStreams((prev) => {
-      const next = [...prev]
-      next[index] = { ...next[index], ...partial }
-      saveStreams(next)
-      return next
-    })
-  }, [saveStreams])
+    const prev = streamsRef.current
+    const next = [...prev]
+    next[index] = { ...next[index], ...partial }
+    commitStreams(next)
+  }, [commitStreams])
 
   const updateStreamBroadcast = useCallback((index, partial) => {
     userEditedRef.current = true
-    setStreams((prev) => {
-      const next = [...prev]
-      next[index] = {
-        ...next[index],
-        broadcast: { ...next[index].broadcast, ...partial },
-      }
-      saveStreams(next)
-      return next
-    })
-  }, [saveStreams])
+    const prev = streamsRef.current
+    const next = [...prev]
+    next[index] = {
+      ...next[index],
+      broadcast: { ...next[index].broadcast, ...partial },
+    }
+    commitStreams(next)
+  }, [commitStreams])
 
   const setActiveSlot = useCallback((index) => {
     setActiveSlotState(index)
+    activeSlotRef.current = index
     setOverlay(null)
     saveStreams(streamsRef.current, index)
   }, [saveStreams])
 
   const selectFrame = useCallback(async (slotIndex = activeSlotRef.current) => {
     if (!isElectron) return
+
+    userEditedRef.current = true
     const filePath = await window.api.files.openImage()
     if (!filePath) return
 
-    userEditedRef.current = true
-    setStreams((prev) => {
-      const slot = prev[slotIndex]
-      if (!slot) return prev
+    const prev = streamsRef.current
+    const slot = prev[slotIndex]
+    if (!slot) return
 
-      let layoutMode = slot.layoutMode
-      if (layoutMode === LAYOUT_MODES.MEDIA_ONLY) {
-        layoutMode = slot.mediaPath ? LAYOUT_MODES.FRAME_MEDIA : LAYOUT_MODES.FRAME_ONLY
+    let layoutMode = slot.layoutMode
+    if (layoutMode === LAYOUT_MODES.MEDIA_ONLY) {
+      layoutMode = slot.mediaPath ? LAYOUT_MODES.FRAME_MEDIA : LAYOUT_MODES.FRAME_ONLY
+    }
+
+    const next = [...prev]
+    next[slotIndex] = { ...slot, framePath: filePath, layoutMode }
+    commitStreams(next)
+
+    if (slotIndex === activeSlotRef.current) {
+      try {
+        const url = await window.api.files.toPreviewUrl(filePath)
+        setFrameUrl(url)
+      } catch {
+        setFrameUrl(null)
       }
-
-      const next = [...prev]
-      next[slotIndex] = { ...slot, framePath: filePath, layoutMode }
-      saveStreams(next)
-      return next
-    })
-  }, [saveStreams])
+    }
+  }, [commitStreams])
 
   const selectMedia = useCallback(async (slotIndex = activeSlotRef.current) => {
     if (!isElectron) return
+
+    userEditedRef.current = true
     const filePath = await window.api.files.openVideo()
     if (!filePath) return
 
-    userEditedRef.current = true
-    setStreams((prev) => {
-      const slot = prev[slotIndex]
-      if (!slot) return prev
+    const prev = streamsRef.current
+    const slot = prev[slotIndex]
+    if (!slot) return
 
-      let layoutMode = slot.layoutMode
-      if (layoutMode === LAYOUT_MODES.FRAME_ONLY) {
-        layoutMode = slot.framePath ? LAYOUT_MODES.FRAME_MEDIA : LAYOUT_MODES.MEDIA_ONLY
-      }
+    let layoutMode = slot.layoutMode
+    if (layoutMode === LAYOUT_MODES.FRAME_ONLY) {
+      layoutMode = slot.framePath ? LAYOUT_MODES.FRAME_MEDIA : LAYOUT_MODES.MEDIA_ONLY
+    }
 
-      const next = [...prev]
-      next[slotIndex] = { ...slot, mediaPath: filePath, mediaStartSeconds: 0, layoutMode }
-      saveStreams(next)
-      return next
-    })
+    const next = [...prev]
+    next[slotIndex] = { ...slot, mediaPath: filePath, mediaStartSeconds: 0, layoutMode }
+    commitStreams(next)
     setMediaTime(0)
-  }, [saveStreams])
+
+    if (slotIndex === activeSlotRef.current) {
+      try {
+        const url = await window.api.files.toPreviewUrl(filePath)
+        setMediaUrl(url)
+      } catch {
+        setMediaUrl(null)
+      }
+    }
+  }, [commitStreams])
 
   const updateYoutubeClientId = useCallback((value) => {
     setYoutubeClientId(value)
+    youtubeClientIdRef.current = value
     if (isElectron) {
       window.api.settings.save({
         streams: streamsRef.current,
@@ -293,12 +330,13 @@ export function AppProvider({ children }) {
     streams,
     activeSlot,
     activeStream,
+    settingsReady,
     setActiveSlot,
     updateStreamSlot,
     updateStreamBroadcast,
-    framePath: activeStream.framePath,
+    framePath: activeStream.framePath || '',
     frameUrl,
-    mediaPath: activeStream.mediaPath,
+    mediaPath: activeStream.mediaPath || '',
     mediaUrl,
     layoutMode: activeStream.layoutMode,
     setLayoutMode: (mode) => updateStreamSlot(activeSlot, { layoutMode: mode }),
@@ -329,13 +367,21 @@ export function AppProvider({ children }) {
     streamCount: STREAM_COUNT,
     isAnyStreaming: Object.keys(liveStreams).length > 0,
   }), [
-    streams, activeSlot, activeStream, liveStreams, overlay, previewSize,
+    streams, activeSlot, activeStream, settingsReady, liveStreams, overlay, previewSize,
     frameUrl, mediaUrl, youtubeClientId, youtubeConnected, youtubeChannelTitle,
     youtubeStreams, mediaTime, mediaDuration, playMedia, pauseMedia, seekMedia,
     selectFrame, selectMedia, connectYouTube, disconnectYouTube,
     refreshYouTubeStreams, initOverlay, setActiveSlot, updateStreamSlot,
     updateStreamBroadcast, setOverlayLocal, persistOverlay,
   ])
+
+  if (!settingsReady) {
+    return (
+      <div className="flex h-full items-center justify-center bg-zinc-950 text-sm text-zinc-400">
+        Loading settings…
+      </div>
+    )
+  }
 
   return (
     <AppContext.Provider value={value}>

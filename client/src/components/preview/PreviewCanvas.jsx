@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useApp } from '../../context/AppContext'
-import { LAYOUT_MODES } from '../../utils/layoutModes'
+import { DEFAULT_OVERLAY, LAYOUT_MODES } from '../../utils/layoutModes'
+import { overlayFromNormalized } from '../../utils/coordinates'
 import DraggableOverlay from './DraggableOverlay'
 
 export default function PreviewCanvas() {
@@ -40,7 +41,15 @@ export default function PreviewCanvas() {
   useEffect(() => {
     if (!previewSize.width || !previewSize.height) return
     initOverlay(previewSize.width, previewSize.height)
-  }, [activeSlot, activeStream.overlay, previewSize.width, previewSize.height, initOverlay])
+  }, [
+    activeSlot,
+    activeStream.overlay,
+    activeStream.mediaPath,
+    activeStream.layoutMode,
+    previewSize.width,
+    previewSize.height,
+    initOverlay,
+  ])
 
   useEffect(() => {
     const video = videoRef.current
@@ -60,6 +69,16 @@ export default function PreviewCanvas() {
   const showFrame = layoutMode === LAYOUT_MODES.FRAME_ONLY || layoutMode === LAYOUT_MODES.FRAME_MEDIA
   const showMedia = layoutMode === LAYOUT_MODES.MEDIA_ONLY || layoutMode === LAYOUT_MODES.FRAME_MEDIA
   const mediaFullscreen = layoutMode === LAYOUT_MODES.MEDIA_ONLY
+
+  const displayOverlay = useMemo(() => {
+    if (overlay) return overlay
+    if (!previewSize.width || !previewSize.height) return null
+    return overlayFromNormalized(
+      activeStream.overlay || DEFAULT_OVERLAY,
+      previewSize,
+    )
+  }, [overlay, activeStream.overlay, previewSize])
+
   const containerSize = {
     width: previewSize.width || containerRef.current?.clientWidth || 0,
     height: previewSize.height || containerRef.current?.clientHeight || 0,
@@ -100,13 +119,13 @@ export default function PreviewCanvas() {
             src={mediaUrl}
             className="absolute inset-0 h-full w-full object-cover"
             playsInline
-            preload="metadata"
+            preload="auto"
           />
         )}
 
-        {showMedia && mediaUrl && !mediaFullscreen && overlay && (
+        {showMedia && mediaUrl && !mediaFullscreen && displayOverlay && (
           <DraggableOverlay
-            overlay={overlay}
+            overlay={displayOverlay}
             setOverlay={setOverlayLocal}
             onPersist={persistOverlay}
             containerSize={containerSize}
@@ -117,7 +136,7 @@ export default function PreviewCanvas() {
               src={mediaUrl}
               className="h-full w-full object-cover"
               playsInline
-              preload="metadata"
+              preload="auto"
             />
           </DraggableOverlay>
         )}
@@ -125,6 +144,12 @@ export default function PreviewCanvas() {
         {showMedia && !mediaUrl && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500">
             Select a media video
+          </div>
+        )}
+
+        {showMedia && mediaUrl && !mediaFullscreen && !displayOverlay && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500">
+            Loading preview…
           </div>
         )}
       </div>
