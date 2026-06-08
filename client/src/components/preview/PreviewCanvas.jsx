@@ -16,6 +16,8 @@ export default function PreviewCanvas() {
     setMediaTime,
     setMediaDuration,
     videoRef,
+    activeSlot,
+    activeStream,
   } = useApp()
 
   useEffect(() => {
@@ -26,7 +28,7 @@ export default function PreviewCanvas() {
       const rect = el.getBoundingClientRect()
       const size = { width: rect.width, height: rect.height }
       setPreviewSize(size)
-      if (!overlay && size.width > 0) {
+      if (size.width > 0) {
         initOverlay(size.width, size.height)
       }
     }
@@ -35,7 +37,7 @@ export default function PreviewCanvas() {
     const observer = new ResizeObserver(updateSize)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [overlay, initOverlay, setPreviewSize])
+  }, [activeSlot, initOverlay, setPreviewSize])
 
   useEffect(() => {
     const video = videoRef.current
@@ -62,7 +64,12 @@ export default function PreviewCanvas() {
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center bg-zinc-900 p-6">
-      <div className="mb-3 text-sm font-medium text-zinc-400">Live Preview</div>
+      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-zinc-400">
+        <span>Live Preview</span>
+        <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+          {activeStream.name}
+        </span>
+      </div>
       <div
         ref={containerRef}
         className="relative aspect-video w-full max-w-4xl overflow-hidden rounded-lg border border-zinc-700 bg-black"

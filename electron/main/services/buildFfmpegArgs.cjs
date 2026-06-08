@@ -9,24 +9,11 @@ function scalePadFilter(width, height) {
   return `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`
 }
 
-function buildOutputArgs(streamKeys) {
-  const urls = streamKeys
-    .filter((key) => key && key.trim())
-    .map((key) => `${YOUTUBE_RTMP}/${key.trim()}`)
-
-  if (urls.length === 0) {
-    throw new Error('No valid stream keys provided')
+function buildOutputArgs(streamKey) {
+  if (!streamKey?.trim()) {
+    throw new Error('No stream key provided')
   }
-
-  if (urls.length === 1) {
-    return ['-f', 'flv', urls[0]]
-  }
-
-  const teeSpec = urls
-    .map((url) => `[f=flv:flvflags=no_duration_filesize]${url}`)
-    .join('|')
-
-  return ['-f', 'tee', teeSpec]
+  return ['-f', 'flv', `${YOUTUBE_RTMP}/${streamKey.trim()}`]
 }
 
 function buildEncodingArgs(bitrateKbps) {
@@ -51,13 +38,13 @@ function buildFfmpegArgs(config) {
     resolution,
     bitrateKbps,
     overlay,
-    streamKeys,
+    streamKey,
     mediaStartSeconds = 0,
   } = config
 
   const { width, height } = RESOLUTIONS[resolution] || RESOLUTIONS['720p']
   const encoding = buildEncodingArgs(bitrateKbps)
-  const output = buildOutputArgs(streamKeys)
+  const output = buildOutputArgs(streamKey)
 
   const args = ['-y', '-hide_banner', '-loglevel', 'warning', '-threads', '2']
 
@@ -105,7 +92,7 @@ function buildFfmpegArgs(config) {
 
     const { x, y, width: ow, height: oh } = overlay
     if (!ow || !oh) {
-      throw new Error('Video overlay size is invalid — resize the preview overlay first')
+      throw new Error('Video overlay size is invalid')
     }
 
     const filter = [
@@ -142,4 +129,36 @@ function buildFfmpegArgs(config) {
   throw new Error(`Unknown layout mode: ${mode}`)
 }
 
-module.exports = { buildFfmpegArgs, RESOLUTIONS }
+function buildOverlayFromNormalized(normalized, resolution) {
+  const { width, height } = RESOLUTIONS[resolution] || RESOLUTIONS['720p']
+  return {
+    x: Math.round(normalized.x * width),
+    y: Math.round(normalized.y * height),
+    width: Math.round(normalized.width * width),
+    height: Math.round(normalized.height * height),
+  }
+}
+
+function buildStreamConfigFromSlot(slot) {
+  const config = {
+    mode: slot.layoutMode,
+    framePath: slot.framePath || null,
+    mediaPath: slot.mediaPath || null,
+    resolution: slot.resolution,
+    bitrateKbps: slot.bitrateKbps,
+    streamKey: slot.streamKey,
+    mediaStartSeconds: slot.mediaStartSeconds || 0,
+  }
+
+  if (slot.layoutMode === 'frame+media' && slot.overlay) {
+    config.overlay = buildOverlayFromNormalized(slot.overlay, slot.resolution)
+  }
+
+  return config
+}
+
+module.exports = {
+  buildFfmpegArgs,
+  buildStreamConfigFromSlot,
+  RESOLUTIONS,
+}

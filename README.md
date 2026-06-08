@@ -30,6 +30,19 @@ cd ../electron
 npm install
 ```
 
+## Multi-Stream
+
+Run up to **5 independent streams** at the same time. Each stream slot has its own:
+
+- Stream key, title, description, privacy, tags
+- Resolution and bitrate
+- Frame/media sources and layout mode
+- PiP overlay position
+
+Use checkboxes to select which streams to start, or start/stop each one individually. Live duration and YouTube watch URL (when API is connected) are shown per stream.
+
+Select **Editing stream** in the left panel to configure preview/sources per slot. Open **Settings** to configure all stream slots via tabs.
+
 ## Broadcast Settings
 
 Set **title**, **description**, **privacy**, **category**, **tags**, and **made for kids** in the Broadcast Settings panel. Settings are saved locally.

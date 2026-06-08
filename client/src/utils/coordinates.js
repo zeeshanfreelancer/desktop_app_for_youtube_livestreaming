@@ -1,5 +1,25 @@
 import { RESOLUTIONS } from './layoutModes'
 
+export function overlayToNormalized(overlay, previewSize) {
+  if (!previewSize.width || !previewSize.height) return overlay
+  return {
+    x: overlay.x / previewSize.width,
+    y: overlay.y / previewSize.height,
+    width: overlay.width / previewSize.width,
+    height: overlay.height / previewSize.height,
+  }
+}
+
+export function overlayFromNormalized(normalized, previewSize) {
+  if (!previewSize.width || !previewSize.height) return null
+  return {
+    x: normalized.x * previewSize.width,
+    y: normalized.y * previewSize.height,
+    width: normalized.width * previewSize.width,
+    height: normalized.height * previewSize.height,
+  }
+}
+
 export function toOutputOverlay(overlay, previewSize, resolution) {
   const { width: outW, height: outH } = RESOLUTIONS[resolution]
   const { width: prevW, height: prevH } = previewSize
@@ -24,6 +44,16 @@ export function toOutputOverlay(overlay, previewSize, resolution) {
   }
 }
 
+export function toOutputOverlayFromNormalized(normalized, resolution) {
+  const { width: outW, height: outH } = RESOLUTIONS[resolution]
+  return {
+    x: Math.round(normalized.x * outW),
+    y: Math.round(normalized.y * outH),
+    width: Math.round(normalized.width * outW),
+    height: Math.round(normalized.height * outH),
+  }
+}
+
 export function clampOverlay(overlay, containerWidth, containerHeight, minSize = 80) {
   const width = Math.max(minSize, Math.min(overlay.width, containerWidth))
   const height = Math.max(minSize, Math.min(overlay.height, containerHeight))
@@ -31,4 +61,13 @@ export function clampOverlay(overlay, containerWidth, containerHeight, minSize =
   const y = Math.max(0, Math.min(overlay.y, containerHeight - height))
 
   return { x, y, width, height }
+}
+
+export function formatDuration(ms) {
+  if (!ms || ms < 0) return '00:00:00'
+  const totalSeconds = Math.floor(ms / 1000)
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  return [h, m, s].map((n) => String(n).padStart(2, '0')).join(':')
 }

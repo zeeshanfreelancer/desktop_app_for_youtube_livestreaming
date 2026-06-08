@@ -1,103 +1,151 @@
 const { ipcMain } = require('electron')
 const fs = require('fs')
-const { FFmpegManager } = require('../services/FFmpegManager.cjs')
+const { MultiStreamManager } = require('../services/MultiStreamManager.cjs')
+const { buildStreamConfigFromSlot } = require('../services/buildFfmpegArgs.cjs')
 const { loadSettings } = require('../services/SecureStore.cjs')
 const {
-  setupBroadcastsForStream,
+  setupBroadcastForSlot,
   completeAllBroadcasts,
 } = require('../services/YouTubeBroadcast.cjs')
 
-function registerStreamHandlers(getMainWindow) {
-  const ffmpegManager = new FFmpegManager()
-  let activeBroadcastIds = []
+function validateSlot(slot, streamIndex) {
+  const label = slot.name || `Stream ${streamIndex + 1}`
 
-  ffmpegManager.setStatusCallback((payload) => {
+  if (!slot.streamKey?.trim()) {
+    return `${label}: stream key is required`
+  }
+
+  if (slot.layoutMode === 'frame-only' && !slot.framePath) {
+    return `${label}: frame image is required for Frame Only mode`
+  }
+
+  if (slot.layoutMode === 'media-only' && !slot.mediaPath) {
+    return `${label}: media video is required for Media Only mode`
+  }
+
+  if (slot.layoutMode === 'frame+media') {
+    if (!slot.framePath) return `${label}: frame image is required`
+    if (!slot.mediaPath) return `${label}: media video is required`
+    if (!slot.overlay?.width || !slot.overlay?.height) {
+      return `${label}: video overlay is not configured`
+    }
+  }
+
+  if (slot.framePath && !fs.existsSync(slot.framePath)) {
+    return `${label}: frame file not found`
+  }
+
+  if (slot.mediaPath && !fs.existsSync(slot.mediaPath)) {
+    return `${label}: media file not found`
+  }
+
+  return null
+}
+
+function registerStreamHandlers(getMainWindow) {
+  const streamManager = new MultiStreamManager()
+  const broadcastIdsByStream = new Map()
+
+  streamManager.setStatusCallback((payload) => {
     const win = getMainWindow()
     if (win && !win.isDestroyed()) {
       win.webContents.send('stream:status', payload)
     }
   })
 
-  ipcMain.handle('stream:start', async (_event, config) => {
-    if (ffmpegManager.isRunning()) {
-      return { success: false, error: 'Stream is already running' }
+  ipcMain.handle('stream:start', async (_event, { streamIndices }) => {
+    const indices = streamIndices || []
+    if (indices.length === 0) {
+      return { success: false, error: 'Select at least one stream to start' }
     }
 
+    const settings = loadSettings()
+    const started = []
+    const errors = []
+
+    for (const index of indices) {
+      if (streamManager.isRunning(index)) {
+        errors.push(`Stream ${index + 1} is already live`)
+        continue
+      }
+
+      const slot = settings.streams[index]
+      if (!slot) {
+        errors.push(`Stream ${index + 1} not found`)
+        continue
+      }
+
+      const validationError = validateSlot(slot, index)
+      if (validationError) {
+        errors.push(validationError)
+        continue
+      }
+
+      try {
+        let meta = { name: slot.name }
+
+        if (settings.youtubeTokens && slot.broadcast?.title?.trim()) {
+          const broadcastMeta = await setupBroadcastForSlot(slot, settings.youtubeTokens)
+          if (broadcastMeta) {
+            meta = { ...meta, ...broadcastMeta }
+            broadcastIdsByStream.set(index, broadcastMeta.broadcastId)
+          }
+        }
+
+        streamManager.startStream(index, buildStreamConfigFromSlot(slot), meta)
+        started.push(index)
+      } catch (err) {
+        errors.push(`Stream ${index + 1}: ${err.message}`)
+      }
+    }
+
+    if (started.length === 0) {
+      return {
+        success: false,
+        error: errors.join('. ') || 'Failed to start streams',
+      }
+    }
+
+    return {
+      success: true,
+      started,
+      warnings: errors.length > 0 ? errors.join('. ') : null,
+    }
+  })
+
+  ipcMain.handle('stream:stop', async (_event, { streamIndex } = {}) => {
     try {
-      const settings = loadSettings()
-      const keys = (config.selectedKeyIndices || [])
-        .map((i) => settings.streamKeys[i])
-        .filter((k) => k && k.trim())
-
-      if (keys.length === 0) {
-        return { success: false, error: 'Select at least one stream key' }
-      }
-
-      if (config.framePath && !fs.existsSync(config.framePath)) {
-        return { success: false, error: 'Frame file not found' }
-      }
-
-      if (config.mediaPath && !fs.existsSync(config.mediaPath)) {
-        return { success: false, error: 'Media file not found' }
-      }
-
-      if (settings.youtubeTokens && settings.broadcast?.title?.trim()) {
-        const missingStreamIds = (config.selectedKeyIndices || []).filter(
-          (i) => !settings.youtube.streamIds?.[i]?.trim(),
-        )
-
-        if (missingStreamIds.length > 0) {
-          return {
-            success: false,
-            error: 'Link each selected stream key to a YouTube stream in Broadcast Settings',
-          }
+      if (streamIndex === undefined || streamIndex === null) {
+        const ids = []
+        for (const [, broadcastId] of broadcastIdsByStream) {
+          if (broadcastId) ids.push(broadcastId)
         }
-
-        try {
-          activeBroadcastIds = await setupBroadcastsForStream(
-            config.selectedKeyIndices,
-            settings,
-          )
-        } catch (err) {
-          return {
-            success: false,
-            error: `YouTube broadcast setup failed: ${err.message}`,
-          }
-        }
+        await streamManager.stopAll()
+        await completeAllBroadcasts(ids)
+        broadcastIdsByStream.clear()
+        return { success: true }
       }
 
-      ffmpegManager.start({
-        ...config,
-        streamKeys: keys,
-      })
+      const { broadcastId } = await streamManager.stopStream(streamIndex)
+      if (broadcastId || broadcastIdsByStream.get(streamIndex)) {
+        await completeAllBroadcasts([
+          broadcastId || broadcastIdsByStream.get(streamIndex),
+        ])
+        broadcastIdsByStream.delete(streamIndex)
+      }
 
       return { success: true }
     } catch (err) {
-      if (activeBroadcastIds.length > 0) {
-        await completeAllBroadcasts(activeBroadcastIds).catch(() => {})
-        activeBroadcastIds = []
-      }
       return { success: false, error: err.message }
     }
   })
 
-  ipcMain.handle('stream:stop', async () => {
-    try {
-      await ffmpegManager.stop()
-
-      if (activeBroadcastIds.length > 0) {
-        await completeAllBroadcasts(activeBroadcastIds)
-        activeBroadcastIds = []
-      }
-
-      return { success: true }
-    } catch (err) {
-      return { success: false, error: err.message }
-    }
+  ipcMain.handle('stream:get-active', () => {
+    return streamManager.getActiveStreams()
   })
 
-  ipcMain.handle('stream:is-running', () => {
-    return ffmpegManager.isRunning()
+  ipcMain.handle('stream:is-running', (_event, streamIndex) => {
+    return streamManager.isRunning(streamIndex)
   })
 }
 

@@ -17,9 +17,11 @@ contextBridge.exposeInMainWorld('api', {
   },
 
   stream: {
-    start: (config) => ipcRenderer.invoke('stream:start', config),
-    stop: () => ipcRenderer.invoke('stream:stop'),
-    isRunning: () => ipcRenderer.invoke('stream:is-running'),
+    start: (streamIndices) => ipcRenderer.invoke('stream:start', { streamIndices }),
+    stop: (streamIndex) => ipcRenderer.invoke('stream:stop', { streamIndex }),
+    stopAll: () => ipcRenderer.invoke('stream:stop', { streamIndex: null }),
+    getActive: () => ipcRenderer.invoke('stream:get-active'),
+    isRunning: (streamIndex) => ipcRenderer.invoke('stream:is-running', streamIndex),
     onStatus: (callback) => {
       const handler = (_event, payload) => callback(payload)
       ipcRenderer.on('stream:status', handler)

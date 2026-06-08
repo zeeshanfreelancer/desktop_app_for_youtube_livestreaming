@@ -10,6 +10,11 @@ function parseTags(tagsString) {
     .slice(0, 30)
 }
 
+function buildLiveUrl(broadcastId) {
+  if (!broadcastId) return null
+  return `https://www.youtube.com/watch?v=${broadcastId}`
+}
+
 async function createAndBindBroadcast(broadcastSettings, streamId) {
   const client = getOAuthClient()
   const youtube = google.youtube({ version: 'v3', auth: client })
@@ -45,7 +50,10 @@ async function createAndBindBroadcast(broadcastSettings, streamId) {
     streamId,
   })
 
-  return broadcastId
+  return {
+    broadcastId,
+    liveUrl: buildLiveUrl(broadcastId),
+  }
 }
 
 async function completeBroadcast(broadcastId) {
@@ -59,33 +67,29 @@ async function completeBroadcast(broadcastId) {
   }).catch(() => {})
 }
 
-async function setupBroadcastsForStream(selectedKeyIndices, settings) {
-  const { broadcast, youtube, youtubeTokens } = settings
-
-  if (!youtubeTokens || !broadcast?.title?.trim()) {
-    return []
+async function setupBroadcastForSlot(slot, youtubeTokens) {
+  if (!youtubeTokens || !slot.broadcast?.title?.trim()) {
+    return null
   }
 
-  const broadcastIds = []
-
-  for (const index of selectedKeyIndices) {
-    const streamId = youtube.streamIds?.[index]?.trim()
-    if (!streamId) continue
-
-    const broadcastId = await createAndBindBroadcast(broadcast, streamId)
-    broadcastIds.push(broadcastId)
+  const streamId = slot.youtubeStreamId?.trim()
+  if (!streamId) {
+    throw new Error(`Link Stream "${slot.name}" to a YouTube stream in settings`)
   }
 
-  return broadcastIds
+  return createAndBindBroadcast(slot.broadcast, streamId)
 }
 
 async function completeAllBroadcasts(broadcastIds) {
   for (const broadcastId of broadcastIds) {
-    await completeBroadcast(broadcastId)
+    if (broadcastId) {
+      await completeBroadcast(broadcastId)
+    }
   }
 }
 
 module.exports = {
-  setupBroadcastsForStream,
+  setupBroadcastForSlot,
   completeAllBroadcasts,
+  buildLiveUrl,
 }
