@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('api', {
     openImage: () => ipcRenderer.invoke('files:open-image'),
     openVideo: () => ipcRenderer.invoke('files:open-video'),
     toPreviewUrl: (filePath) => ipcRenderer.invoke('files:to-preview-url', filePath),
+    getVideoDuration: (filePath) => ipcRenderer.invoke('files:get-video-duration', filePath),
   },
 
   settings: {

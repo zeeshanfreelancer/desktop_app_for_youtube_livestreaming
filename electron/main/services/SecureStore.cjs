@@ -35,6 +35,7 @@ function createDefaultStreamSlot(index) {
     mediaPath: '',
     overlay: { ...DEFAULT_OVERLAY },
     mediaStartSeconds: 0,
+    mediaLoop: false,
   }
 }
 

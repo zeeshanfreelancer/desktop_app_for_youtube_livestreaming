@@ -40,6 +40,7 @@ function buildFfmpegArgs(config) {
     overlay,
     streamKey,
     mediaStartSeconds = 0,
+    mediaLoop = false,
   } = config
 
   const { width, height } = RESOLUTIONS[resolution] || RESOLUTIONS['720p']
@@ -71,6 +72,10 @@ function buildFfmpegArgs(config) {
       args.push('-ss', String(mediaStartSeconds))
     }
 
+    if (mediaLoop) {
+      args.push('-stream_loop', '-1')
+    }
+
     args.push(
       '-re',
       '-i', mediaPath,
@@ -95,10 +100,11 @@ function buildFfmpegArgs(config) {
       throw new Error('Video overlay size is invalid')
     }
 
+    const overlayEnd = mediaLoop ? 0 : 1
     const filter = [
       `[0:v]${scalePadFilter(width, height)}[bg]`,
       `[1:v]scale=${ow}:${oh}[vid]`,
-      `[bg][vid]overlay=${x}:${y}:shortest=1[outv]`,
+      `[bg][vid]overlay=${x}:${y}:shortest=${overlayEnd}[outv]`,
     ].join(';')
 
     args.push(
@@ -109,6 +115,10 @@ function buildFfmpegArgs(config) {
 
     if (mediaStartSeconds > 0) {
       args.push('-ss', String(mediaStartSeconds))
+    }
+
+    if (mediaLoop) {
+      args.push('-stream_loop', '-1')
     }
 
     args.push(
@@ -148,6 +158,7 @@ function buildStreamConfigFromSlot(slot) {
     bitrateKbps: slot.bitrateKbps,
     streamKey: slot.streamKey,
     mediaStartSeconds: slot.mediaStartSeconds || 0,
+    mediaLoop: Boolean(slot.mediaLoop),
   }
 
   if (slot.layoutMode === 'frame+media' && slot.overlay) {

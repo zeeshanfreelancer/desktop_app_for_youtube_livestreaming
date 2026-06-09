@@ -63,6 +63,14 @@ export function clampOverlay(overlay, containerWidth, containerHeight, minSize =
   return { x, y, width, height }
 }
 
+export function formatMediaTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0:00'
+  const totalSeconds = Math.floor(seconds)
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function formatDuration(ms) {
   if (!ms || ms < 0) return '00:00:00'
   const totalSeconds = Math.floor(ms / 1000)

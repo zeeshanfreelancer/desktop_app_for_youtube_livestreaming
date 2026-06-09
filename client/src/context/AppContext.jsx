@@ -23,6 +23,7 @@ export function AppProvider({ children }) {
   const [mediaTime, setMediaTime] = useState(0)
   const [mediaDuration, setMediaDuration] = useState(0)
   const videoRef = useRef(null)
+  const mediaSeekingRef = useRef(false)
   const userEditedRef = useRef(false)
   const streamsRef = useRef(streams)
   const activeSlotRef = useRef(activeSlot)
@@ -134,8 +135,19 @@ export function AppProvider({ children }) {
   }, [refreshYouTubeStatus, refreshActiveStreams])
 
   useEffect(() => {
-    setMediaTime(activeStream.mediaStartSeconds || 0)
-  }, [activeSlot, activeStream.mediaStartSeconds])
+    if (mediaSeekingRef.current) return
+    const time = activeStream.mediaStartSeconds || 0
+    setMediaTime(time)
+    const video = videoRef.current
+    if (!video || video.readyState < 1) return
+    const duration = video.duration
+    const target = Number.isFinite(duration) && duration > 0
+      ? Math.min(time, duration)
+      : time
+    if (Math.abs(video.currentTime - target) > 0.25) {
+      video.currentTime = target
+    }
+  }, [activeSlot, activeStream.mediaStartSeconds, mediaUrl])
 
   useEffect(() => {
     setOverlay(null)
@@ -160,14 +172,33 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!isElectron || !activeStream.mediaPath) {
       setMediaUrl(null)
+      setMediaDuration(0)
       return
     }
 
     let cancelled = false
-    window.api.files.toPreviewUrl(activeStream.mediaPath).then((url) => {
-      if (!cancelled) setMediaUrl(url)
+    const mediaPath = activeStream.mediaPath
+
+    const durationPromise = typeof window.api.files.getVideoDuration === 'function'
+      ? window.api.files.getVideoDuration(mediaPath).catch(() => null)
+      : Promise.resolve(null)
+
+    Promise.all([
+      window.api.files.toPreviewUrl(mediaPath),
+      durationPromise,
+    ]).then(([url, duration]) => {
+      if (cancelled) return
+      setMediaUrl(url)
+      if (Number.isFinite(duration) && duration > 0) {
+        setMediaDuration(duration)
+      } else {
+        setMediaDuration(0)
+      }
     }).catch(() => {
-      if (!cancelled) setMediaUrl(null)
+      if (!cancelled) {
+        setMediaUrl(null)
+        setMediaDuration(0)
+      }
     })
 
     return () => { cancelled = true }
@@ -361,11 +392,43 @@ export function AppProvider({ children }) {
     videoRef.current?.pause()
   }, [])
 
-  const seekMedia = useCallback((time) => {
+  const seekMedia = useCallback((time, { persist = true } = {}) => {
+    const video = videoRef.current
+    const duration = video?.duration
+    let clamped = Math.max(0, Number(time) || 0)
+    if (Number.isFinite(duration) && duration > 0) {
+      clamped = Math.min(clamped, duration)
+    }
+
+    const applySeek = () => {
+      if (!video) return
+      try {
+        video.currentTime = clamped
+        setMediaTime(video.currentTime)
+      } catch {
+        setMediaTime(clamped)
+      }
+    }
+
+    if (video) {
+      if (video.readyState >= 1) {
+        applySeek()
+      } else {
+        video.addEventListener('loadedmetadata', applySeek, { once: true })
+      }
+    } else {
+      setMediaTime(clamped)
+    }
+
+    if (persist) {
+      updateStreamSlot(activeSlotRef.current, { mediaStartSeconds: clamped })
+    }
+  }, [updateStreamSlot])
+
+  const setMediaLoop = useCallback((enabled) => {
+    updateStreamSlot(activeSlotRef.current, { mediaLoop: enabled })
     if (videoRef.current) {
-      videoRef.current.currentTime = time
-      setMediaTime(time)
-      updateStreamSlot(activeSlotRef.current, { mediaStartSeconds: time })
+      videoRef.current.loop = enabled
     }
   }, [updateStreamSlot])
 
@@ -397,6 +460,9 @@ export function AppProvider({ children }) {
     setMediaTime,
     mediaDuration,
     setMediaDuration,
+    mediaLoop: Boolean(activeStream.mediaLoop),
+    setMediaLoop,
+    mediaSeekingRef,
     videoRef,
     playMedia,
     pauseMedia,
@@ -414,7 +480,8 @@ export function AppProvider({ children }) {
   }), [
     streams, activeSlot, activeStream, settingsReady, liveStreams, overlay, previewSize,
     frameUrl, mediaUrl, youtubeClientId, youtubeConnected, youtubeChannelTitle,
-    youtubeStreams, mediaTime, mediaDuration, playMedia, pauseMedia, seekMedia,
+    youtubeStreams, mediaTime, mediaDuration, activeStream.mediaLoop, setMediaLoop,
+    playMedia, pauseMedia, seekMedia,
     selectFrame, selectMedia, clearFrame, clearMedia, connectYouTube, disconnectYouTube,
     refreshYouTubeStreams, initOverlay, setActiveSlot, updateStreamSlot,
     updateStreamBroadcast, setOverlayLocal, persistOverlay,

@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { dialog, ipcMain } = require('electron')
+const { getVideoDuration } = require('../services/mediaInfo.cjs')
 
 const IMAGE_MIME = {
   '.png': 'image/png',
@@ -77,6 +78,13 @@ function registerFileHandlers(getMainWindow) {
     }
 
     return null
+  })
+
+  ipcMain.handle('files:get-video-duration', async (_event, filePath) => {
+    if (!filePath || !fs.existsSync(filePath)) {
+      return null
+    }
+    return getVideoDuration(filePath)
   })
 }
 

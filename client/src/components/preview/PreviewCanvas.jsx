@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext'
 import { DEFAULT_OVERLAY, LAYOUT_MODES } from '../../utils/layoutModes'
 import { overlayFromNormalized } from '../../utils/coordinates'
 import DraggableOverlay from './DraggableOverlay'
+import MediaPreviewVideo from './MediaPreviewVideo'
 
 export default function PreviewCanvas() {
   const containerRef = useRef(null)
@@ -17,6 +18,7 @@ export default function PreviewCanvas() {
     initOverlay,
     setMediaTime,
     setMediaDuration,
+    mediaSeekingRef,
     videoRef,
     activeSlot,
     activeStream,
@@ -52,19 +54,8 @@ export default function PreviewCanvas() {
   ])
 
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
-
-    const onTimeUpdate = () => setMediaTime(video.currentTime)
-    const onLoadedMetadata = () => setMediaDuration(video.duration || 0)
-
-    video.addEventListener('timeupdate', onTimeUpdate)
-    video.addEventListener('loadedmetadata', onLoadedMetadata)
-    return () => {
-      video.removeEventListener('timeupdate', onTimeUpdate)
-      video.removeEventListener('loadedmetadata', onLoadedMetadata)
-    }
-  }, [mediaUrl, setMediaTime, setMediaDuration, videoRef])
+    setMediaTime(activeStream.mediaStartSeconds || 0)
+  }, [mediaUrl, activeSlot, activeStream.mediaStartSeconds, setMediaTime])
 
   const showFrame = layoutMode === LAYOUT_MODES.FRAME_ONLY || layoutMode === LAYOUT_MODES.FRAME_MEDIA
   const showMedia = layoutMode === LAYOUT_MODES.MEDIA_ONLY || layoutMode === LAYOUT_MODES.FRAME_MEDIA
@@ -82,6 +73,43 @@ export default function PreviewCanvas() {
   const containerSize = {
     width: previewSize.width || containerRef.current?.clientWidth || 0,
     height: previewSize.height || containerRef.current?.clientHeight || 0,
+  }
+
+  const videoProps = {
+    src: mediaUrl,
+    startAt: activeStream.mediaStartSeconds || 0,
+    loop: Boolean(activeStream.mediaLoop),
+    mediaSeekingRef,
+    onDuration: (duration) => {
+      if (Number.isFinite(duration) && duration > 0) {
+        setMediaDuration(duration)
+      }
+    },
+    onTimeUpdate: setMediaTime,
+  }
+
+  const renderMediaVideo = (className) => (
+    <MediaPreviewVideo key={mediaUrl} ref={videoRef} {...videoProps} className={className} />
+  )
+
+  let mediaVideo = null
+  if (mediaUrl) {
+    if (showMedia && mediaFullscreen) {
+      mediaVideo = renderMediaVideo('absolute inset-0 h-full w-full object-cover')
+    } else if (showMedia && displayOverlay) {
+      mediaVideo = (
+        <DraggableOverlay
+          overlay={displayOverlay}
+          setOverlay={setOverlayLocal}
+          onPersist={persistOverlay}
+          containerSize={containerSize}
+        >
+          {renderMediaVideo('h-full w-full object-cover')}
+        </DraggableOverlay>
+      )
+    } else {
+      mediaVideo = renderMediaVideo('pointer-events-none absolute h-px w-px opacity-0')
+    }
   }
 
   return (
@@ -112,34 +140,7 @@ export default function PreviewCanvas() {
           </div>
         )}
 
-        {showMedia && mediaUrl && mediaFullscreen && (
-          <video
-            key={mediaUrl}
-            ref={videoRef}
-            src={mediaUrl}
-            className="absolute inset-0 h-full w-full object-cover"
-            playsInline
-            preload="auto"
-          />
-        )}
-
-        {showMedia && mediaUrl && !mediaFullscreen && displayOverlay && (
-          <DraggableOverlay
-            overlay={displayOverlay}
-            setOverlay={setOverlayLocal}
-            onPersist={persistOverlay}
-            containerSize={containerSize}
-          >
-            <video
-              key={mediaUrl}
-              ref={videoRef}
-              src={mediaUrl}
-              className="h-full w-full object-cover"
-              playsInline
-              preload="auto"
-            />
-          </DraggableOverlay>
-        )}
+        {mediaVideo}
 
         {showMedia && !mediaUrl && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-500">

@@ -1,7 +1,6 @@
 const fs = require('fs')
 const path = require('path')
-const { protocol, net } = require('electron')
-const { pathToFileURL } = require('url')
+const { protocol } = require('electron')
 
 const MIME_TYPES = {
   '.png': 'image/png',
@@ -38,6 +37,31 @@ function resolveFilePath(request) {
   return path.normalize(fromPath)
 }
 
+function streamFileRange(filePath, start, end, contentType, statSize) {
+  const chunkSize = end - start + 1
+  const stream = fs.createReadStream(filePath, { start, end })
+  const body = new ReadableStream({
+    start(controller) {
+      stream.on('data', (chunk) => controller.enqueue(new Uint8Array(chunk)))
+      stream.on('end', () => controller.close())
+      stream.on('error', (err) => controller.error(err))
+    },
+    cancel() {
+      stream.destroy()
+    },
+  })
+
+  return new Response(body, {
+    status: 206,
+    headers: {
+      'Content-Type': contentType,
+      'Content-Length': String(chunkSize),
+      'Content-Range': `bytes ${start}-${end}/${statSize}`,
+      'Accept-Ranges': 'bytes',
+    },
+  })
+}
+
 function registerLocalMediaProtocol() {
   protocol.handle('local-media', async (request) => {
     try {
@@ -52,54 +76,12 @@ function registerLocalMediaProtocol() {
       const stat = fs.statSync(filePath)
       const rangeHeader = request.headers.get('Range')
 
-      try {
-        const fileUrl = pathToFileURL(filePath).href
-        const response = await net.fetch(fileUrl, {
-          method: request.method,
-          headers: request.headers,
-        })
-
-        if (response.ok) {
-          const headers = new Headers(response.headers)
-          headers.set('Content-Type', contentType)
-          headers.set('Accept-Ranges', 'bytes')
-          return new Response(response.body, {
-            status: response.status,
-            statusText: response.statusText,
-            headers,
-          })
-        }
-      } catch {
-        // fall through to manual streaming
-      }
-
       if (rangeHeader) {
         const match = /bytes=(\d+)-(\d*)/.exec(rangeHeader)
         if (match) {
           const start = Number(match[1])
           const end = match[2] ? Number(match[2]) : stat.size - 1
-          const chunkSize = end - start + 1
-          const stream = fs.createReadStream(filePath, { start, end })
-          const body = new ReadableStream({
-            start(controller) {
-              stream.on('data', (chunk) => controller.enqueue(new Uint8Array(chunk)))
-              stream.on('end', () => controller.close())
-              stream.on('error', (err) => controller.error(err))
-            },
-            cancel() {
-              stream.destroy()
-            },
-          })
-
-          return new Response(body, {
-            status: 206,
-            headers: {
-              'Content-Type': contentType,
-              'Content-Length': String(chunkSize),
-              'Content-Range': `bytes ${start}-${end}/${stat.size}`,
-              'Accept-Ranges': 'bytes',
-            },
-          })
+          return streamFileRange(filePath, start, end, contentType, stat.size)
         }
       }
 
