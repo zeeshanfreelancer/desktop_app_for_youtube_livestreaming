@@ -2,7 +2,9 @@ node_modules/
 client/node_modules/
 electron/node_modules/
 client/dist/
+electron/renderer/
 electron/release/
+electron/dist-app/
 release/
 dist/
 *.log

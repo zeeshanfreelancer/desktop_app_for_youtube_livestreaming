@@ -25,16 +25,17 @@
     "appId": "com.youtubestream.app",
     "productName": "YouTube Stream",
     "directories": {
-      "output": "release"
+      "output": "dist-app"
     },
     "files": [
       "main/**/*",
       "preload/**/*",
-      "../client/dist/**/*",
+      "renderer/**/*",
       "node_modules/ffmpeg-static/**/*"
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "signAndEditExecutable": false
     }
   }
 }

@@ -8,7 +8,7 @@ const { registerStreamHandlers } = require('./ipc/stream.cjs')
 const { registerYouTubeHandlers } = require('./ipc/youtube.cjs')
 
 const useDevServer = process.env.ELECTRON_DEV === '1'
-const distHtml = path.join(__dirname, '../../client/dist/index.html')
+const rendererHtml = path.join(__dirname, '../renderer/index.html')
 
 let mainWindow = null
 
@@ -32,8 +32,8 @@ function createWindow() {
 
   if (useDevServer) {
     mainWindow.loadURL('http://localhost:5173')
-  } else if (fs.existsSync(distHtml)) {
-    mainWindow.loadFile(distHtml)
+  } else if (fs.existsSync(rendererHtml)) {
+    mainWindow.loadFile(rendererHtml)
   } else {
     mainWindow.loadURL('http://localhost:5173')
   }
