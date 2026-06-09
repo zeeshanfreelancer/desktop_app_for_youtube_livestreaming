@@ -1,5 +1,5 @@
 const { spawn } = require('child_process')
-const ffmpegPath = require('ffmpeg-static')
+const { resolveFfmpegPath } = require('../utils/resolveFfmpegPath.cjs')
 const { buildFfmpegArgs } = require('./buildFfmpegArgs.cjs')
 
 class FFmpegManager {
@@ -28,6 +28,7 @@ class FFmpegManager {
       throw new Error('Stream is already running')
     }
 
+    const ffmpegPath = resolveFfmpegPath()
     if (!ffmpegPath) {
       throw new Error('FFmpeg binary not found')
     }
